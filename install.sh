@@ -34,15 +34,18 @@ if ! command -v xray &> /dev/null; then
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 fi
 
-# 3. SSL 证书全自动申请 (Cloudflare DNS 模式)
+# 3. SSL 证书全自动处理 (非通配符模式，提高兼容性)
 echo "🔑 证书自动签发..."
 if [ ! -d "/root/.acme.sh" ]; then
     curl https://get.acme.sh | sh
 fi
-alias acme.sh=~/.acme.sh/acme.sh
-~/.acme.sh/acme.sh --register-account -m $EMAIL --server zerossl
-systemctl stop nginx
-~/.acme.sh/acme.sh --issue -d $DOMAIN -d "*.$DOMAIN" --standalone --force
+# 停止 Nginx 以便占用 80 端口进行验证
+systemctl stop nginx || true
+
+# 申请证书 (同时包含主域名和 api 二级域名)
+# 注意：这里去掉了 *.DOMAIN，改成了明确的 api.$DOMAIN
+~/.acme.sh/acme.sh --issue -d $DOMAIN -d "api.$DOMAIN" --standalone --force --server zerossl
+
 mkdir -p /etc/nginx/ssl/
 ~/.acme.sh/acme.sh --install-cert -d $DOMAIN --key-file /etc/nginx/ssl/private.key --fullchain-file /etc/nginx/ssl/fullchain.cer
 
